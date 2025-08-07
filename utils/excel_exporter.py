@@ -97,7 +97,12 @@ class ExcelExporter:
                 'Job Title': job.title,
                 'Company': job.company,
                 'Location': job.location,
-                'URL': job.url or '',
+                'Description': job.description or '',
+                'Poster Name': job.poster_name or '',
+                'Poster Position': job.poster_position or '',
+                'Email': job.email or '',
+                'Apply Link': job.url or '',
+                'Date Posted': job.date_posted or '',
                 'Scraped Date': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             })
             

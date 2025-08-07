@@ -14,6 +14,10 @@ class JobPosting(BaseModel):
     location: str
     url: Optional[str] = None
     description: Optional[str] = None
+    poster_name: Optional[str] = None
+    poster_position: Optional[str] = None
+    email: Optional[str] = None
+    date_posted: Optional[str] = None
 
 class ScrapingResponse(BaseModel):
     """Model for scraping response"""

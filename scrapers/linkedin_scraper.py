@@ -86,8 +86,13 @@ class LinkedInScraper:
                         title=job_data.get('title', 'Unknown Title'),
                         company=job_data.get('company', 'Unknown Company'),
                         location=job_data.get('location', 'Unknown Location'),
-                        url=job_data.get('link', ''),
-                        description=job_data.get('description', '')
+                        url=job_data.get('apply_link', ''),
+                        description=job_data.get('description', ''),
+                        # Add new fields for enhanced data
+                        poster_name=job_data.get('poster_name', ''),
+                        poster_position=job_data.get('poster_position', ''),
+                        email=job_data.get('email', ''),
+                        date_posted=job_data.get('date_posted', '')
                     )
                     job_postings.append(job_posting)
                     
