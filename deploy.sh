@@ -8,7 +8,6 @@ cd "/root/$APP_DIRECTORY"
 
 # Step 2: Git Pull
 sudo git pull
-
 # Step 3: Activate virtual environment
 source venv/bin/activate
 
