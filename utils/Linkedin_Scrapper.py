@@ -15,20 +15,64 @@ import re
 import os
 import platform
 import shutil
+import subprocess
 
 # Configure logging settings
 logging.basicConfig(filename="scraping.log", level=logging.INFO)
+
+
+def get_chromium_version():
+    """Get Chromium version to ensure ChromeDriver compatibility"""
+    try:
+        chromium_path = shutil.which("chromium-browser") or shutil.which("chromium")
+        if chromium_path:
+            result = subprocess.run([chromium_path, "--version"], 
+                                  capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                version_line = result.stdout.strip()
+                # Extract version number (e.g., "Chromium 120.0.6099.109")
+                version_match = re.search(r'(\d+)\.(\d+)\.(\d+)', version_line)
+                if version_match:
+                    major_version = version_match.group(1)
+                    logging.info(f"Chromium version: {major_version}")
+                    return major_version
+    except Exception as e:
+        logging.warning(f"Could not determine Chromium version: {str(e)}")
+    return None
 
 
 def get_driver(options):
     """
     Initialize Chrome or Chromium driver depending on environment.
     """
+    # Essential options for server environments
     options.add_argument("--headless=new")  # Use new headless mode for Chrome >= 109
     options.add_argument("--no-sandbox")  # Required in Docker/low-permission environments
     options.add_argument("--disable-dev-shm-usage")  # Avoid limited /dev/shm space issues
     options.add_argument("--disable-gpu")  # GPU not available
     options.add_argument("--disable-extensions")
+    options.add_argument("--disable-web-security")
+    options.add_argument("--disable-features=VizDisplayCompositor")
+    options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--disable-background-timer-throttling")
+    options.add_argument("--disable-backgrounding-occluded-windows")
+    options.add_argument("--disable-renderer-backgrounding")
+    options.add_argument("--disable-field-trial-config")
+    options.add_argument("--disable-ipc-flooding-protection")
+    options.add_argument("--disable-default-apps")
+    options.add_argument("--disable-sync")
+    options.add_argument("--disable-translate")
+    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-component-extensions-with-background-pages")
+    options.add_argument("--disable-client-side-phishing-detection")
+    options.add_argument("--disable-hang-monitor")
+    options.add_argument("--disable-prompt-on-repost")
+    options.add_argument("--disable-domain-reliability")
+    options.add_argument("--disable-features=TranslateUI")
+    options.add_argument("--disable-ipc-flooding-protection")
+    options.add_argument("--no-first-run")
+    options.add_argument("--no-default-browser-check")
+    options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--remote-debugging-port=9222")  # Needed in some headless environments
 
     system = platform.system().lower()
@@ -40,6 +84,9 @@ def get_driver(options):
         if chromium_path:
             logging.info(f"Using Chromium at {chromium_path}")
             options.binary_location = chromium_path
+            
+            # Get Chromium version for compatibility
+            chromium_version = get_chromium_version()
             
             # Try multiple approaches to get ChromeDriver
             chromedriver_path = None
@@ -71,7 +118,12 @@ def get_driver(options):
             if not chromedriver_path:
                 logging.warning("ChromeDriver not found or failed — falling back to webdriver_manager")
                 try:
-                    service = Service(ChromeDriverManager().install())
+                    # Use webdriver_manager with version matching if possible
+                    if chromium_version:
+                        from webdriver_manager.chrome import ChromeDriverManager
+                        service = Service(ChromeDriverManager(version=chromium_version).install())
+                    else:
+                        service = Service(ChromeDriverManager().install())
                     return webdriver.Chrome(service=service, options=options)
                 except Exception as e:
                     logging.error(f"Failed to install ChromeDriver via webdriver_manager: {str(e)}")
@@ -106,12 +158,32 @@ def scrape_linkedin_jobs(job_title: str, location: str, pages: int = None) -> li
 
     # Set up Chrome options
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
+    options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
     options.add_argument("--disable-extensions")
+    options.add_argument("--disable-web-security")
+    options.add_argument("--disable-features=VizDisplayCompositor")
+    options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--disable-background-timer-throttling")
+    options.add_argument("--disable-backgrounding-occluded-windows")
+    options.add_argument("--disable-renderer-backgrounding")
+    options.add_argument("--disable-field-trial-config")
+    options.add_argument("--disable-ipc-flooding-protection")
+    options.add_argument("--disable-default-apps")
+    options.add_argument("--disable-sync")
+    options.add_argument("--disable-translate")
+    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-component-extensions-with-background-pages")
+    options.add_argument("--disable-client-side-phishing-detection")
+    options.add_argument("--disable-hang-monitor")
+    options.add_argument("--disable-prompt-on-repost")
+    options.add_argument("--disable-domain-reliability")
+    options.add_argument("--disable-features=TranslateUI")
+    options.add_argument("--no-first-run")
+    options.add_argument("--no-default-browser-check")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option('useAutomationExtension', False)
