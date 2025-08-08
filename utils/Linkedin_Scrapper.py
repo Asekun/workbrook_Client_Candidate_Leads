@@ -24,6 +24,13 @@ def get_driver(options):
     """
     Initialize Chrome or Chromium driver depending on environment.
     """
+    options.add_argument("--headless=new")  # Use new headless mode for Chrome >= 109
+    options.add_argument("--no-sandbox")  # Required in Docker/low-permission environments
+    options.add_argument("--disable-dev-shm-usage")  # Avoid limited /dev/shm space issues
+    options.add_argument("--disable-gpu")  # GPU not available
+    options.add_argument("--disable-extensions")
+    options.add_argument("--remote-debugging-port=9222")  # Needed in some headless environments
+
     system = platform.system().lower()
 
     if system == "linux":
