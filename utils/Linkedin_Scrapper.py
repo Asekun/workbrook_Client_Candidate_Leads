@@ -36,21 +36,63 @@ def get_driver(options):
     if system == "linux":
         # Use Chromium if available
         chromium_path = shutil.which("chromium-browser") or shutil.which("chromium")
-        chromedriver_path = shutil.which("chromedriver")
-
-        if chromium_path and chromedriver_path:
+        
+        if chromium_path:
             logging.info(f"Using Chromium at {chromium_path}")
             options.binary_location = chromium_path
-            return webdriver.Chrome(service=Service(chromedriver_path), options=options)
+            
+            # Try multiple approaches to get ChromeDriver
+            chromedriver_path = None
+            
+            # First try: check if chromedriver is in PATH
+            chromedriver_path = shutil.which("chromedriver")
+            
+            # Second try: check common installation paths
+            if not chromedriver_path:
+                common_paths = [
+                    "/usr/bin/chromedriver",
+                    "/usr/local/bin/chromedriver",
+                    "/snap/bin/chromedriver"
+                ]
+                for path in common_paths:
+                    if os.path.exists(path):
+                        chromedriver_path = path
+                        break
+            
+            if chromedriver_path:
+                logging.info(f"Using ChromeDriver at {chromedriver_path}")
+                try:
+                    return webdriver.Chrome(service=Service(chromedriver_path), options=options)
+                except Exception as e:
+                    logging.warning(f"Failed to use ChromeDriver at {chromedriver_path}: {str(e)}")
+                    chromedriver_path = None
+            
+            # Fallback to webdriver_manager if chromedriver not found or failed
+            if not chromedriver_path:
+                logging.warning("ChromeDriver not found or failed — falling back to webdriver_manager")
+                try:
+                    service = Service(ChromeDriverManager().install())
+                    return webdriver.Chrome(service=service, options=options)
+                except Exception as e:
+                    logging.error(f"Failed to install ChromeDriver via webdriver_manager: {str(e)}")
+                    raise Exception("Could not initialize ChromeDriver")
         else:
             logging.warning("Chromium not found — falling back to webdriver_manager Chrome")
-            service = Service(ChromeDriverManager().install())
-            return webdriver.Chrome(service=service, options=options)
+            try:
+                service = Service(ChromeDriverManager().install())
+                return webdriver.Chrome(service=service, options=options)
+            except Exception as e:
+                logging.error(f"Failed to install ChromeDriver via webdriver_manager: {str(e)}")
+                raise Exception("Could not initialize ChromeDriver")
 
     else:
         # On macOS/Windows — use Chrome via webdriver_manager
-        service = Service(ChromeDriverManager().install())
-        return webdriver.Chrome(service=service, options=options)
+        try:
+            service = Service(ChromeDriverManager().install())
+            return webdriver.Chrome(service=service, options=options)
+        except Exception as e:
+            logging.error(f"Failed to install ChromeDriver via webdriver_manager: {str(e)}")
+            raise Exception("Could not initialize ChromeDriver")
 
 
 
