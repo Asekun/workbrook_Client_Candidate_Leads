@@ -17,6 +17,35 @@ import os
 # Configure logging settings
 logging.basicConfig(filename="scraping.log", level=logging.INFO)
 
+import platform
+import shutil
+
+def get_driver(options):
+    """
+    Initialize Chrome or Chromium driver depending on environment.
+    """
+    system = platform.system().lower()
+
+    # Detect if running on Linux (likely the droplet)
+    if system == "linux":
+        # Prefer pre-installed Chromium on server
+        chromium_path = shutil.which("chromium-browser") or shutil.which("chromium")
+        chromedriver_path = shutil.which("chromedriver")
+
+        if chromium_path and chromedriver_path:
+            logging.info(f"Using Chromium at {chromium_path}")
+            options.binary_location = chromium_path
+            return webdriver.Chrome(executable_path=chromedriver_path, options=options)
+        else:
+            logging.warning("Chromium not found — falling back to webdriver_manager Chrome")
+            service = Service(ChromeDriverManager().install())
+            return webdriver.Chrome(service=service, options=options)
+
+    else:
+        # On macOS or Windows — use webdriver_manager Chrome
+        service = Service(ChromeDriverManager().install())
+        return webdriver.Chrome(service=service, options=options)
+
 
 def scrape_linkedin_jobs(job_title: str, location: str, pages: int = None) -> list:
     """
@@ -64,52 +93,32 @@ def scrape_linkedin_jobs(job_title: str, location: str, pages: int = None) -> li
 
     driver = None
     max_retries = 3
-    
+
     for attempt in range(max_retries):
         try:
-            # Initialize the web driver with automatic ChromeDriver management
-            # Force download of latest ChromeDriver
             os.environ['WDM_LOG_LEVEL'] = '0'  # Suppress webdriver-manager logs
-            
-            if attempt == 0:
-                # First attempt: try with default (latest) version
-                service = Service(ChromeDriverManager().install())
-            elif attempt == 1:
-                # Second attempt: try clearing cache and retrying
-                import shutil
-                cache_dir = os.path.expanduser("~/.wdm")
-                if os.path.exists(cache_dir):
-                    shutil.rmtree(cache_dir)
-                service = Service(ChromeDriverManager().install())
-            else:
-                # Third attempt: try with specific version
-                service = Service(ChromeDriverManager().install())
-            
-            # Set longer timeout for driver initialization
-            # driver = webdriver.Chrome(service=service, options=options)
-            driver = webdriver.Chrome(executable_path="/usr/bin/chromedriver", options=options)
-            
-            # Set page load timeout
+
+            driver = get_driver(options)
+
             driver.set_page_load_timeout(30)
             driver.implicitly_wait(10)
-            
-            logging.info(f"ChromeDriver initialized successfully on attempt {attempt + 1}")
-            break  # Success, exit retry loop
-            
+
+            logging.info(f"WebDriver initialized successfully on attempt {attempt + 1}")
+            break  # success
+
         except Exception as e:
-            logging.warning(f"ChromeDriver initialization attempt {attempt + 1} failed: {str(e)}")
+            logging.warning(f"WebDriver initialization attempt {attempt + 1} failed: {str(e)}")
             if driver:
                 try:
                     driver.quit()
                 except:
                     pass
                 driver = None
-            
+
             if attempt == max_retries - 1:
-                logging.error("All ChromeDriver initialization attempts failed")
+                logging.error("All WebDriver initialization attempts failed")
                 return []
-            
-            # Wait before retry
+
             time.sleep(2)
     
     if not driver:
