@@ -28,11 +28,11 @@ class LinkedInScraper:
         Initialize the LinkedIn scraper
         
         Args:
-            browser_manager: Not used in this implementation as we use the existing scraper
+            browser_manager: Not used in this implementation as we use Playwright
         """
-        # Import the existing working scraper
-        from utils.Linkedin_Scrapper import scrape_linkedin_jobs
-        self.scrape_linkedin_jobs = scrape_linkedin_jobs
+        # Import the Playwright scraper
+        from scrapers.linkedin_scraper_playwright import scrape_linkedin_jobs_playwright
+        self.scrape_linkedin_jobs_playwright = scrape_linkedin_jobs_playwright
         
     async def scrape_jobs(self, job_title: str, location: str, max_jobs: int = 5) -> List[JobPosting]:
         """
@@ -54,11 +54,8 @@ class LinkedInScraper:
             # The original scraper can handle up to 50 pages, so we'll use more pages
             pages = max(2, (max_jobs + 24) // 25)  # Minimum 2 pages for better results
             
-            # Run the existing scraper in a thread to avoid blocking
-            loop = asyncio.get_event_loop()
-            jobs_data = await loop.run_in_executor(
-                None, 
-                self.scrape_linkedin_jobs, 
+            # Run the Playwright scraper
+            jobs_data = await self.scrape_linkedin_jobs_playwright(
                 job_title, 
                 location, 
                 pages
