@@ -30,6 +30,7 @@ from datetime import datetime
 
 from scrapers.indeed_scraper import IndeedScraper
 from scrapers.linkedin_scraper import LinkedInScraper
+from scrapers.google_jobs_scraper import GoogleJobsScraper
 from utils.browser_manager import BrowserManager
 from utils.excel_exporter import ExcelExporter
 from models import JobPosting, ScrapingResponse
@@ -66,6 +67,8 @@ async def root():
             "indeed_json": "/scrape/indeed?job=<job_title>&location=<location>&max_jobs=5",
             "indeed_excel": "/scrape/indeed/excel?job=<job_title>&location=<location>&max_jobs=5",
             "linkedin_excel": "/scrape/linkedin?job=<job_title>&location=<location>&max_jobs=5",
+            "google_jobs_json": "/scrape/google-jobs?job=<job_title>&location=<location>&max_jobs=5",
+            "google_jobs_excel": "/scrape/google-jobs/excel?job=<job_title>&location=<location>&max_jobs=5",
             "list_exports": "/exports",
             "download_export": "/exports/{filename}"
         },
@@ -381,6 +384,180 @@ async def scrape_indeed_excel(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to scrape Indeed: {str(e)}"
+        )
+
+@app.get("/scrape/google-jobs", response_model=ScrapingResponse)
+async def scrape_google_jobs(
+    job: str = Query(..., description="Job title to search for"),
+    location: str = Query(..., description="Job location"),
+    max_jobs: int = Query(5, description="Maximum number of jobs to scrape", ge=1, le=20)
+):
+    """
+    Scrape job postings from Google Jobs
+    
+    Args:
+        job: Job title to search for
+        location: Job location
+        max_jobs: Maximum number of jobs to scrape (default: 5, max: 20)
+    
+    Returns:
+        ScrapingResponse with job listings
+    """
+    try:
+        logger.info(f"Starting Google Jobs scrape for: {job} in {location}")
+        
+        # Use browser manager as async context manager
+        async with BrowserManager() as browser_manager:
+            # Create scraper instance
+            scraper = GoogleJobsScraper(browser_manager)
+            
+            # Scrape jobs
+            jobs = await scraper.scrape_jobs(job, location, max_jobs)
+            
+            return ScrapingResponse(
+                success=True,
+                message=f"Successfully scraped {len(jobs)} jobs from Google Jobs",
+                jobs=jobs,
+                total_count=len(jobs)
+            )
+        
+    except Exception as e:
+        logger.error(f"Error scraping Google Jobs: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to scrape Google Jobs: {str(e)}"
+        )
+
+@app.get("/scrape/google")
+async def scrape_google(
+    job: str = Query(..., description="Job title to search for"),
+    location: str = Query(..., description="Job location"),
+    max_jobs: int = Query(5, description="Maximum number of jobs to scrape", ge=1, le=20)
+):
+    """
+    Scrape job postings from Google Jobs and download as Excel file
+    
+    Args:
+        job: Job title to search for
+        location: Job location
+        max_jobs: Maximum number of jobs to scrape (default: 5, max: 20)
+    
+    Returns:
+        Excel file download
+    """
+    try:
+        logger.info(f"Starting Google Jobs scrape for Excel: {job} in {location}")
+        
+        # Use browser manager as async context manager
+        async with BrowserManager() as browser_manager:
+            # Create scraper instance
+            scraper = GoogleJobsScraper(browser_manager)
+            
+            # Scrape jobs
+            jobs = await scraper.scrape_jobs(job, location, max_jobs)
+            
+            if not jobs:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No jobs found for the given criteria"
+                )
+            
+            # Create Excel file in memory and return as download
+            import io
+            import pandas as pd
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.utils import get_column_letter
+            
+            # Create DataFrame with job data
+            data = []
+            for i, job_obj in enumerate(jobs, 1):
+                data.append({
+                    'ID': i,
+                    'Job Title': job_obj.title,
+                    'Company': job_obj.company,
+                    'Location': job_obj.location,
+                    'Description': job_obj.description or '',
+                    'Poster Name': job_obj.poster_name or '',
+                    'Poster Position': job_obj.poster_position or '',
+                    'Email': job_obj.email or '',
+                    'Apply Link': job_obj.url or '',
+                    'Date Posted': job_obj.date_posted or '',
+                    'Scraped Date': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                })
+            
+            df = pd.DataFrame(data)
+            
+            # Create Excel file in memory
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='Jobs', index=False)
+                
+                # Get the workbook and worksheet
+                workbook = writer.book
+                worksheet = writer.sheets['Jobs']
+                
+                # Apply formatting
+                header_font = Font(bold=True, color="FFFFFF")
+                header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                header_alignment = Alignment(horizontal="center", vertical="center")
+                
+                # Apply header formatting
+                for col in range(1, len(df.columns) + 1):
+                    cell = worksheet.cell(row=1, column=col)
+                    cell.font = header_font
+                    cell.fill = header_fill
+                    cell.alignment = header_alignment
+                    
+                # Auto-adjust column widths
+                for col in range(1, len(df.columns) + 1):
+                    column_letter = get_column_letter(col)
+                    max_length = 0
+                    
+                    # Find the maximum length in the column
+                    for row in range(1, worksheet.max_row + 1):
+                        cell_value = worksheet[f"{column_letter}{row}"].value
+                        if cell_value:
+                            max_length = max(max_length, len(str(cell_value)))
+                            
+                    # Set column width (with some padding)
+                    adjusted_width = min(max_length + 2, 50)
+                    worksheet.column_dimensions[column_letter].width = adjusted_width
+                    
+                # Add borders to all cells
+                thin_border = Border(
+                    left=Side(style='thin'),
+                    right=Side(style='thin'),
+                    top=Side(style='thin'),
+                    bottom=Side(style='thin')
+                )
+                
+                for row in worksheet.iter_rows(min_row=1, max_row=worksheet.max_row, min_col=1, max_col=len(df.columns)):
+                    for cell in row:
+                        cell.border = thin_border
+            
+            # Prepare the response
+            output.seek(0)
+            
+            # Generate filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_job_title = job.replace(' ', '_').replace('/', '_').replace('\\', '_')[:30]
+            safe_location = location.replace(' ', '_').replace('/', '_').replace('\\', '_')[:30]
+            filename = f"google_jobs_{safe_job_title}_{safe_location}_{timestamp}.xlsx"
+            
+            # Return the Excel file as download
+            from fastapi.responses import StreamingResponse
+            return StreamingResponse(
+                io.BytesIO(output.getvalue()),
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+        
+    except Exception as e:
+        logger.error(f"Error scraping Google Jobs for Excel: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to scrape Google Jobs: {str(e)}"
         )
 
 

@@ -1,10 +1,10 @@
 #!/bin/bash
 
 DOMAIN_NAME="scraper.yourdomain.com"
-APP_DIRECTORY="scrapper"
+APP_DIRECTORY="workbrook_Client_Candidate_Leads/"
 
 # Step 1: Change directory
-cd "/root/apps/$APP_DIRECTORY"
+cd "/root/$APP_DIRECTORY"
 
 # Step 2: Git Pull
 sudo git pull

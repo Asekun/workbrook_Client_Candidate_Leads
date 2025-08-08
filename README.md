@@ -6,6 +6,7 @@ A robust FastAPI application for scraping job postings from Indeed and LinkedIn 
 
 - **Indeed Scraping**: Scrape job listings from Indeed.com
 - **LinkedIn Scraping**: Scrape job listings from LinkedIn.com with optional login
+- **Google Jobs Scraping**: Scrape job listings from Google Jobs search results
 - **Excel Export**: Download scraped data as formatted Excel files
 - **Anti-Detection**: Built-in stealth measures to avoid bot detection
 - **Async Processing**: Full async/await support for better performance
@@ -22,7 +23,8 @@ scrapper/
 ├── scrapers/              # Scraper modules
 │   ├── __init__.py
 │   ├── indeed_scraper.py  # Indeed.com scraper
-│   └── linkedin_scraper.py # LinkedIn.com scraper
+│   ├── linkedin_scraper.py # LinkedIn.com scraper
+│   └── google_jobs_scraper.py # Google Jobs scraper
 └── utils/                 # Utility modules
     ├── __init__.py
     └── browser_manager.py # Browser management and anti-detection
@@ -139,6 +141,24 @@ curl "http://localhost:8000/scrape/linkedin?job=python+developer&location=remote
 
 # Excel download
 curl "http://localhost:8000/scrape/linkedin/excel?job=python+developer&location=remote&max_jobs=5" -o jobs.xlsx
+```
+
+### Google Jobs Scraping
+- **GET** `/scrape/google-jobs` - Scrape job postings from Google Jobs (JSON response)
+- **GET** `/scrape/google-jobs/excel` - Scrape job postings from Google Jobs and download as Excel file
+
+**Query Parameters:**
+- `job` (required): Job title to search for
+- `location` (required): Job location
+- `max_jobs` (optional): Maximum number of jobs to scrape (default: 5, max: 20)
+
+**Examples:**
+```bash
+# JSON response
+curl "http://localhost:8000/scrape/google-jobs?job=python+developer&location=remote&max_jobs=5"
+
+# Excel download
+curl "http://localhost:8000/scrape/google-jobs/excel?job=python+developer&location=remote&max_jobs=5" -o jobs.xlsx
 ```
 
 ### Export Management
