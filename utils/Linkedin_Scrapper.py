@@ -86,7 +86,8 @@ def scrape_linkedin_jobs(job_title: str, location: str, pages: int = None) -> li
                 service = Service(ChromeDriverManager().install())
             
             # Set longer timeout for driver initialization
-            driver = webdriver.Chrome(service=service, options=options)
+            # driver = webdriver.Chrome(service=service, options=options)
+            driver = webdriver.Chrome(executable_path="/usr/bin/chromedriver", options=options)
             
             # Set page load timeout
             driver.set_page_load_timeout(30)
