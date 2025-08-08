@@ -27,14 +27,14 @@ def get_driver(options):
     system = platform.system().lower()
 
     if system == "linux":
-        # Use Chromium if available (lighter for cloud servers)
+        # Use Chromium if available
         chromium_path = shutil.which("chromium-browser") or shutil.which("chromium")
         chromedriver_path = shutil.which("chromedriver")
 
         if chromium_path and chromedriver_path:
             logging.info(f"Using Chromium at {chromium_path}")
             options.binary_location = chromium_path
-            return webdriver.Chrome(executable_path=chromedriver_path, options=options)
+            return webdriver.Chrome(service=Service(chromedriver_path), options=options)
         else:
             logging.warning("Chromium not found — falling back to webdriver_manager Chrome")
             service = Service(ChromeDriverManager().install())
@@ -44,6 +44,7 @@ def get_driver(options):
         # On macOS/Windows — use Chrome via webdriver_manager
         service = Service(ChromeDriverManager().install())
         return webdriver.Chrome(service=service, options=options)
+
 
 
 def scrape_linkedin_jobs(job_title: str, location: str, pages: int = None) -> list:
