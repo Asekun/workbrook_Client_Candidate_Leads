@@ -24,11 +24,10 @@ logging.basicConfig(filename="scraping.log", level=logging.INFO)
 def get_chromium_version():
     """Get Chromium version to ensure ChromeDriver compatibility"""
     try:
-        chromium_path = shutil.which(
-            "chromium-browser") or shutil.which("chromium")
+        chromium_path = shutil.which("chromium-browser") or shutil.which("chromium")
         if chromium_path:
-            result = subprocess.run([chromium_path, "--version"],
-                                    capture_output=True, text=True, timeout=10)
+            result = subprocess.run([chromium_path, "--version"], 
+                                  capture_output=True, text=True, timeout=10)
             if result.returncode == 0:
                 version_line = result.stdout.strip()
                 # Extract version number (e.g., "Chromium 120.0.6099.109")
@@ -47,12 +46,9 @@ def get_driver(options):
     Initialize Chrome or Chromium driver depending on environment.
     """
     # Essential options for server environments
-    # Use new headless mode for Chrome >= 109
-    options.add_argument("--headless=new")
-    # Required in Docker/low-permission environments
-    options.add_argument("--no-sandbox")
-    # Avoid limited /dev/shm space issues
-    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--headless=new")  # Use new headless mode for Chrome >= 109
+    options.add_argument("--no-sandbox")  # Required in Docker/low-permission environments
+    options.add_argument("--disable-dev-shm-usage")  # Avoid limited /dev/shm space issues
     options.add_argument("--disable-gpu")  # GPU not available
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-web-security")
@@ -67,8 +63,7 @@ def get_driver(options):
     options.add_argument("--disable-sync")
     options.add_argument("--disable-translate")
     options.add_argument("--disable-background-networking")
-    options.add_argument(
-        "--disable-component-extensions-with-background-pages")
+    options.add_argument("--disable-component-extensions-with-background-pages")
     options.add_argument("--disable-client-side-phishing-detection")
     options.add_argument("--disable-hang-monitor")
     options.add_argument("--disable-prompt-on-repost")
@@ -78,28 +73,86 @@ def get_driver(options):
     options.add_argument("--no-first-run")
     options.add_argument("--no-default-browser-check")
     options.add_argument("--disable-blink-features=AutomationControlled")
-    # Needed in some headless environments
-    options.add_argument("--remote-debugging-port=9222")
+    options.add_argument("--remote-debugging-port=9222")  # Needed in some headless environments
 
     system = platform.system().lower()
 
-    logging.warning(
-        "Chromium not found — falling back to webdriver_manager Chrome")
-    try:
-        service = Service(ChromeDriverManager().install())
-        return webdriver.Chrome(service=service, options=options)
-    except Exception as e:
-        logging.error(
-            f"Failed to install ChromeDriver via webdriver_manager: {str(e)}")
-        raise Exception("Could not initialize ChromeDriver")
+    if system == "linux":
+        # Use Chromium if available
+        chromium_path = shutil.which("chromium-browser") or shutil.which("chromium")
+        
+        if chromium_path:
+            logging.info(f"Using Chromium at {chromium_path}")
+            options.binary_location = chromium_path
+            
+            # Get Chromium version for compatibility
+            chromium_version = get_chromium_version()
+            
+            # Try multiple approaches to get ChromeDriver
+            chromedriver_path = None
+            
+            # First try: check if chromedriver is in PATH
+            chromedriver_path = shutil.which("chromedriver")
+            
+            # Second try: check common installation paths
+            if not chromedriver_path:
+                common_paths = [
+                    "/usr/bin/chromedriver",
+                    "/usr/local/bin/chromedriver",
+                    "/snap/bin/chromedriver"
+                ]
+                for path in common_paths:
+                    if os.path.exists(path):
+                        chromedriver_path = path
+                        break
+            
+            if chromedriver_path:
+                logging.info(f"Using ChromeDriver at {chromedriver_path}")
+                try:
+                    return webdriver.Chrome(service=Service(chromedriver_path), options=options)
+                except Exception as e:
+                    logging.warning(f"Failed to use ChromeDriver at {chromedriver_path}: {str(e)}")
+                    chromedriver_path = None
+            
+            # Fallback to webdriver_manager if chromedriver not found or failed
+            if not chromedriver_path:
+                logging.warning("ChromeDriver not found or failed — falling back to webdriver_manager")
+                try:
+                    # Use webdriver_manager with version matching if possible
+                    if chromium_version:
+                        from webdriver_manager.chrome import ChromeDriverManager
+                        service = Service(ChromeDriverManager(version=chromium_version).install())
+                    else:
+                        service = Service(ChromeDriverManager().install())
+                    return webdriver.Chrome(service=service, options=options)
+                except Exception as e:
+                    logging.error(f"Failed to install ChromeDriver via webdriver_manager: {str(e)}")
+                    raise Exception("Could not initialize ChromeDriver")
+        else:
+            logging.warning("Chromium not found — falling back to webdriver_manager Chrome")
+            try:
+                service = Service(ChromeDriverManager().install())
+                return webdriver.Chrome(service=service, options=options)
+            except Exception as e:
+                logging.error(f"Failed to install ChromeDriver via webdriver_manager: {str(e)}")
+                raise Exception("Could not initialize ChromeDriver")
+
+    else:
+        # On macOS/Windows — use Chrome via webdriver_manager
+        try:
+            service = Service(ChromeDriverManager().install())
+            return webdriver.Chrome(service=service, options=options)
+        except Exception as e:
+            logging.error(f"Failed to install ChromeDriver via webdriver_manager: {str(e)}")
+            raise Exception("Could not initialize ChromeDriver")
+
 
 
 def scrape_linkedin_jobs(job_title: str, location: str, pages: int = None) -> list:
     """
     Scrape job listings from LinkedIn based on job title and location.
     """
-    logging.info(
-        f'Starting LinkedIn job scrape for "{job_title}" in "{location}"...')
+    logging.info(f'Starting LinkedIn job scrape for "{job_title}" in "{location}"...')
 
     pages = pages or 1
 
@@ -123,8 +176,7 @@ def scrape_linkedin_jobs(job_title: str, location: str, pages: int = None) -> li
     options.add_argument("--disable-sync")
     options.add_argument("--disable-translate")
     options.add_argument("--disable-background-networking")
-    options.add_argument(
-        "--disable-component-extensions-with-background-pages")
+    options.add_argument("--disable-component-extensions-with-background-pages")
     options.add_argument("--disable-client-side-phishing-detection")
     options.add_argument("--disable-hang-monitor")
     options.add_argument("--disable-prompt-on-repost")
@@ -157,13 +209,11 @@ def scrape_linkedin_jobs(job_title: str, location: str, pages: int = None) -> li
             driver.set_page_load_timeout(30)
             driver.implicitly_wait(10)
 
-            logging.info(
-                f"WebDriver initialized successfully on attempt {attempt + 1}")
+            logging.info(f"WebDriver initialized successfully on attempt {attempt + 1}")
             break
 
         except Exception as e:
-            logging.warning(
-                f"WebDriver initialization attempt {attempt + 1} failed: {str(e)}")
+            logging.warning(f"WebDriver initialization attempt {attempt + 1} failed: {str(e)}")
             if driver:
                 try:
                     driver.quit()
@@ -188,14 +238,12 @@ def scrape_linkedin_jobs(job_title: str, location: str, pages: int = None) -> li
 
         for i in range(pages):
             logging.info(f"Scrolling to bottom of page {i+1}...")
-            driver.execute_script(
-                "window.scrollTo(0, document.body.scrollHeight);")
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
             try:
                 element = WebDriverWait(driver, 5).until(
                     EC.presence_of_element_located(
-                        (By.XPATH,
-                         "/html/body/div[1]/div/main/section[2]/button")
+                        (By.XPATH, "/html/body/div[1]/div/main/section[2]/button")
                     )
                 )
                 element.click()
@@ -213,16 +261,14 @@ def scrape_linkedin_jobs(job_title: str, location: str, pages: int = None) -> li
 
         try:
             for job in job_listings:
-                job_title = job.find(
-                    "h3", class_="base-search-card__title").text.strip()
+                job_title = job.find("h3", class_="base-search-card__title").text.strip()
                 job_company = job.find(
                     "h4", class_="base-search-card__subtitle"
                 ).text.strip()
                 job_location = job.find(
                     "span", class_="job-search-card__location"
                 ).text.strip()
-                apply_link = job.find(
-                    "a", class_="base-card__full-link")["href"]
+                apply_link = job.find("a", class_="base-card__full-link")["href"]
 
                 driver.get(apply_link)
                 time.sleep(random.choice(list(range(5, 11))))
@@ -245,11 +291,9 @@ def scrape_linkedin_jobs(job_title: str, location: str, pages: int = None) -> li
                     if poster_section:
                         poster_text = poster_section.get_text(strip=True)
                         if "Posted by" in poster_text:
-                            poster_name = poster_text.replace(
-                                "Posted by", "").strip()
+                            poster_name = poster_text.replace("Posted by", "").strip()
                         else:
-                            posted_match = re.search(
-                                r'Posted by (.+?)(?:\s+•|\s*$)', poster_text)
+                            posted_match = re.search(r'Posted by (.+?)(?:\s+•|\s*$)', poster_text)
                             if posted_match:
                                 poster_name = posted_match.group(1).strip()
 
@@ -273,14 +317,12 @@ def scrape_linkedin_jobs(job_title: str, location: str, pages: int = None) -> li
                         if not date_posted:
                             date_posted = date_element.get_text(strip=True)
 
-                    apply_button = job_soup.find(
-                        "a", class_="jobs-apply-button")
+                    apply_button = job_soup.find("a", class_="jobs-apply-button")
                     if apply_button:
                         apply_link = apply_button.get("href", apply_link)
 
                 except AttributeError as e:
-                    logging.warning(
-                        f"AttributeError occurred while retrieving job details: {str(e)}")
+                    logging.warning(f"AttributeError occurred while retrieving job details: {str(e)}")
 
                 jobs.append(
                     {
@@ -295,8 +337,7 @@ def scrape_linkedin_jobs(job_title: str, location: str, pages: int = None) -> li
                         "date_posted": date_posted,
                     }
                 )
-                logging.info(
-                    f'Scraped "{job_title}" at {job_company} in {job_location}...')
+                logging.info(f'Scraped "{job_title}" at {job_company} in {job_location}...')
 
         except Exception as e:
             logging.error(f"An error occurred while scraping jobs: {str(e)}")
@@ -318,8 +359,7 @@ def save_job_data(data: dict) -> None:
     Save job data to a CSV file.
     """
     df = pd.DataFrame(data)
-    df.to_csv(
-        f"new_jobs_{datetime.now().strftime('%Y-%m-%d')}.csv", index=False)
+    df.to_csv(f"new_jobs_{datetime.now().strftime('%Y-%m-%d')}.csv", index=False)
     logging.info(f"Successfully scraped {len(data)} jobs and saved to CSV")
 
 
