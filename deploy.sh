@@ -44,7 +44,7 @@ pm2 describe workbrook-leads >/dev/null
 RUNNING=$?
 
 if [ $RUNNING -ne 0 ]; then
-    pm2 start "venv/bin/uvicorn main:app --host 0.0.0.0 --port 8005" \
+    pm2 start "uvicorn main:app --host 0.0.0.0 --port 8005" \
     --name workbrook-leads \
     --interpreter bash
 else
