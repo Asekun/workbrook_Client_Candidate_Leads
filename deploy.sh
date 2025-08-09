@@ -44,9 +44,10 @@ pm2 describe workbrook-leads >/dev/null
 RUNNING=$?
 
 if [ $RUNNING -ne 0 ]; then
-    pm2 start "uvicorn main:app --host 0.0.0.0 --port 8005" \
-    --name workbrook-leads \
-    --interpreter bash
+    # pm2 start "uvicorn main:app --host 0.0.0.0 --port 8005" \
+    # --name workbrook-leads \
+    # --interpreter bash
+    pm2 start uvicorn --name workbrook-leads --interpreter python3 -- main:app --host 0.0.0.0 --port 8005
 else
     pm2 restart workbrook-leads
 fi
