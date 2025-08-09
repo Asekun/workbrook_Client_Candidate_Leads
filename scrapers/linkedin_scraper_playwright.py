@@ -36,7 +36,7 @@ class LinkedInScraperPlaywright:
         """Initialize Playwright browser with optimal settings for server"""
         playwright = await async_playwright().start()
         
-        # Launch browser with server-optimized settings
+        # Launch browser with server-optimized settings and anti-detection measures
         self.browser = await playwright.chromium.launch(
             headless=True,
             args=[
@@ -64,31 +64,142 @@ class LinkedInScraperPlaywright:
                 '--no-first-run',
                 '--no-default-browser-check',
                 '--disable-blink-features=AutomationControlled',
+                '--disable-extensions',
+                '--disable-plugins',
+                '--disable-images',
+                '--disable-javascript',
+                '--disable-css',
+                '--disable-background-networking',
+                '--disable-sync',
+                '--disable-translate',
+                '--disable-default-apps',
+                '--disable-extensions-file-access-check',
+                '--disable-extensions-http-throttling',
+                '--disable-ipc-flooding-protection',
+                '--disable-renderer-backgrounding',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-features=TranslateUI',
+                '--disable-features=VizDisplayCompositor',
+                '--disable-software-rasterizer',
+                '--disable-gpu-sandbox',
+                '--disable-accelerated-2d-canvas',
+                '--disable-accelerated-jpeg-decoding',
+                '--disable-accelerated-mjpeg-decode',
+                '--disable-accelerated-video-decode',
+                '--disable-gpu-memory-buffer-video-frames',
                 '--remote-debugging-port=9222'
             ]
         )
         
-        # Create context with optimized settings
+        # Create context with optimized settings and anti-detection measures
         context = await self.browser.new_context(
             viewport={'width': 1920, 'height': 1080},
-            user_agent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             extra_http_headers={
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Accept-Encoding': 'gzip, deflate, br',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                 'DNT': '1',
                 'Connection': 'keep-alive',
                 'Upgrade-Insecure-Requests': '1',
-            }
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0',
+            },
+            locale='en-US',
+            timezone_id='America/New_York'
         )
         
         self.page = await context.new_page()
         
-        # Set page load timeout
-        self.page.set_default_timeout(30000)
+        # Set page load timeout and add anti-detection measures
+        self.page.set_default_timeout(60000)  # Increase timeout to 60 seconds
+        
+        # Add JavaScript to hide automation indicators
+        await self.page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined,
+            });
+            
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5],
+            });
+            
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['en-US', 'en'],
+            });
+            
+            window.chrome = {
+                runtime: {},
+            };
+        """)
         
         return playwright
         
+    async def scrape_jobs_fallback(self, job_title: str, location: str, max_jobs: int = 5) -> List[JobPosting]:
+        """
+        Fallback scraping method using a different approach
+        """
+        try:
+            logger.info("Using fallback scraping method...")
+            
+            # Try a different URL format
+            search_url = f"https://www.linkedin.com/jobs/search?keywords={job_title}&location={location}&f_TPR=r86400"
+            
+            await self.page.goto(search_url, wait_until='domcontentloaded')
+            await asyncio.sleep(3)
+            
+            # Try to find job cards with a different selector
+            job_cards = await self.page.query_selector_all('[data-job-id]')
+            
+            if not job_cards:
+                # Try another selector
+                job_cards = await self.page.query_selector_all('.job-search-card')
+            
+            logger.info(f"Found {len(job_cards)} job cards with fallback method")
+            
+            jobs = []
+            for i, job_card in enumerate(job_cards[:max_jobs]):
+                try:
+                    # Extract basic information
+                    title_element = await job_card.query_selector('h3, .job-search-card__title')
+                    company_element = await job_card.query_selector('h4, .job-search-card__subtitle')
+                    location_element = await job_card.query_selector('.job-search-card__location')
+                    
+                    if title_element:
+                        job_title = await title_element.inner_text()
+                        company = await company_element.inner_text() if company_element else "Unknown Company"
+                        location = await location_element.inner_text() if location_element else "Unknown Location"
+                        
+                        # Create basic job posting
+                        job_posting = JobPosting(
+                            title=job_title.strip(),
+                            company=company.strip(),
+                            location=location.strip(),
+                            url="",
+                            description="",
+                            poster_name="",
+                            poster_position="",
+                            email="",
+                            date_posted=""
+                        )
+                        
+                        jobs.append(job_posting)
+                        logger.info(f'Scraped "{job_title}" at {company} in {location}...')
+                        
+                except Exception as e:
+                    logger.warning(f"Error processing job {i+1} in fallback: {str(e)}")
+                    continue
+            
+            return jobs
+            
+        except Exception as e:
+            logger.error(f"Fallback method also failed: {str(e)}")
+            return []
+
     async def scrape_jobs(self, job_title: str, location: str, max_jobs: int = 5) -> List[JobPosting]:
         """
         Scrape job postings from LinkedIn using Playwright
@@ -108,12 +219,41 @@ class LinkedInScraperPlaywright:
             # Setup browser
             playwright = await self.setup_browser()
             
-            # Navigate to LinkedIn jobs search
+            # Navigate to LinkedIn jobs search with retry logic
             search_url = f"https://www.linkedin.com/jobs/search/?keywords={job_title}&location={location}"
-            await self.page.goto(search_url)
             
-            # Wait for page to load
-            await self.page.wait_for_load_state('networkidle')
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"Attempting to load LinkedIn (attempt {attempt + 1}/{max_retries})")
+                    
+                    # Navigate to the page
+                    await self.page.goto(search_url, wait_until='domcontentloaded')
+                    
+                    # Wait for page to load with different strategies
+                    try:
+                        await self.page.wait_for_load_state('networkidle', timeout=30000)
+                    except:
+                        # If networkidle fails, wait for specific elements
+                        await self.page.wait_for_selector('.base-card', timeout=30000)
+                    
+                    # Check if page loaded successfully
+                    page_title = await self.page.title()
+                    if 'LinkedIn' in page_title or 'Jobs' in page_title:
+                        logger.info("LinkedIn page loaded successfully")
+                        break
+                    else:
+                        raise Exception("Page title doesn't match expected LinkedIn page")
+                        
+                except Exception as e:
+                    logger.warning(f"Attempt {attempt + 1} failed: {str(e)}")
+                    if attempt == max_retries - 1:
+                        # Try fallback method
+                        logger.info("Main method failed, trying fallback...")
+                        return await self.scrape_jobs_fallback(job_title, location, max_jobs)
+                    
+                    # Wait before retry
+                    await asyncio.sleep(5)
             
             # Scroll and load more jobs
             pages = max(2, (max_jobs + 24) // 25)  # Minimum 2 pages for better results
