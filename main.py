@@ -62,11 +62,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",
+        "*",
         "http://localhost:8000", 
         "https://admin.workbrook.us",
         "https://lead.workbrook.us",
-        "https://workbrook.us",
         "https://*.workbrook.us"
     ],
     allow_credentials=True,
@@ -141,7 +140,7 @@ async def scrape_indeed(
 async def scrape_linkedin(
     job: str = Query(..., description="Job title to search for"),
     location: str = Query(..., description="Job location"),
-    max_jobs: int = Query(100, description="Maximum number of jobs to scrape", ge=1, le=200)
+    max_jobs: int = Query(50, description="Maximum number of jobs to scrape", ge=1, le=200)
 ):
     """
     Enhanced LinkedIn scraper with company contact reconnaissance fallback
