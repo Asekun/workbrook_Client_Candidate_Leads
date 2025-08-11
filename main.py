@@ -61,10 +61,19 @@ app = FastAPI(
 # Add CORS middleware to allow any origin
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "https://admin.workbrook.us"],  # Allows all origins
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:8000", 
+        "https://admin.workbrook.us",
+        "https://lead.workbrook.us",
+        "https://workbrook.us",
+        "https://*.workbrook.us"
+    ],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
+    max_age=3600,
 )
 
 @app.get("/", response_model=dict)
