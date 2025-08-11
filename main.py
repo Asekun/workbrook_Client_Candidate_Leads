@@ -140,7 +140,7 @@ async def scrape_indeed(
 async def scrape_linkedin(
     job: str = Query(..., description="Job title to search for"),
     location: str = Query(..., description="Job location"),
-    max_jobs: int = Query(50, description="Maximum number of jobs to scrape", ge=1, le=200)
+    max_jobs: int = Query(30, description="Maximum number of jobs to scrape", ge=1, le=200)
 ):
     """
     Enhanced LinkedIn scraper with company contact reconnaissance fallback
@@ -275,7 +275,7 @@ async def scrape_linkedin(
 async def scrape_linkedin_enhanced(
     job: str = Query(..., description="Job title to search for"),
     location: str = Query(..., description="Job location"),
-    max_jobs: int = Query(50, description="Maximum number of jobs to scrape", ge=1, le=200)
+    max_jobs: int = Query(30, description="Maximum number of jobs to scrape", ge=1, le=200)
 ):
     """
     Enhanced LinkedIn scraper that also extracts company contact information
